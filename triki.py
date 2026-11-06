@@ -58,21 +58,28 @@ async def find_triki(timeout: float = 8):
 
 
 class Triki:
-    def __init__(self, client: BleakClient):
+    def __init__(self, client: BleakClient, queue: asyncio.Queue):
         self.client = client
-        self._q: asyncio.Queue = asyncio.Queue()
+        self._q = queue
         self._buf = b""
 
     @classmethod
     async def connect(cls, device=None):
         device = device or await find_triki()
         if device is None:
-            raise RuntimeError("no Triki found (awake? Żappka/TrikiScope closed?)")
-        client = BleakClient(device, timeout=20)
+            raise RuntimeError("no Triki found (awake? other apps closed?)")
+        q: asyncio.Queue = asyncio.Queue()
+        # None in the queue signals a disconnect to samples()
+        client = BleakClient(device, timeout=20,
+                             disconnected_callback=lambda _: q.put_nowait(None))
         await client.connect()
-        t = cls(client)
-        await client.start_notify(TX, t._on_notify)
-        await client.write_gatt_char(RX, INIT, response=False)
+        t = cls(client, q)
+        try:
+            await client.start_notify(TX, t._on_notify)
+            await client.write_gatt_char(RX, INIT, response=False)
+        except BaseException:
+            await client.disconnect()
+            raise
         return t
 
     def _on_notify(self, _, data: bytearray):
@@ -86,7 +93,10 @@ class Triki:
 
     async def samples(self) -> AsyncIterator[Sample]:
         while True:
-            yield await self._q.get()
+            s = await self._q.get()
+            if s is None:
+                raise ConnectionError("Triki disconnected")
+            yield s
 
     async def set_led(self, on: bool):
         await self.client.write_gatt_char(LED, bytes([1 if on else 0]), response=True)
@@ -108,19 +118,24 @@ async def main():
                 await t.set_led(on)
                 await asyncio.sleep(0.5)
 
-        last: Optional[bool] = None
-        n = 0
-        end = asyncio.get_event_loop().time() + args.seconds
-        async for s in t.samples():
-            if s.button != last:  # edge detection
-                print("button", "PRESSED" if s.button else "released")
-                last = s.button
-            n += 1
-            if n % 10 == 0:
-                print(f"gyro={tuple(round(x, 1) for x in s.gyro)} deg/s  "
-                      f"accel={tuple(round(x, 2) for x in s.accel)} g")
-            if asyncio.get_event_loop().time() > end:
-                break
+        async def stream():
+            last: Optional[bool] = None
+            n = 0
+            async for s in t.samples():
+                if s.button != last:  # edge detection
+                    print("button", "PRESSED" if s.button else "released")
+                    last = s.button
+                n += 1
+                if n % 10 == 0:
+                    print(f"gyro={tuple(round(x, 1) for x in s.gyro)} deg/s  "
+                          f"accel={tuple(round(x, 2) for x in s.accel)} g")
+
+        try:
+            await asyncio.wait_for(stream(), args.seconds)
+        except asyncio.TimeoutError:
+            pass
+        except ConnectionError as e:
+            print(e)
     finally:
         await t.close()
 

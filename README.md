@@ -1,8 +1,8 @@
-# Triki BLE client
+# Żabka Triki demo BLE client
 
 Minimal Python client for the Żabka "Triki" BLE device (nRF52810 + LSM6DSL IMU). Streams gyro/accelerometer data and button state, and controls the LED.
 
-Findings below were verified on a real device. They come from the reverse-engineering notes in `.tmp/` (`triki.md` and the `zabka-triki-hardware` repo), where the two sources disagreed in places.
+Findings below were verified on a real device.
 
 ## Quick start
 
@@ -21,7 +21,7 @@ async for s in t.samples():   # s.button, s.gyro (deg/s), s.accel (g)
 await t.close()
 ```
 
-On macOS the terminal needs Bluetooth permission. Close the Żappka app and TrikiScope first: the device accepts only one connection.
+On macOS the terminal needs Bluetooth permission. Close the Żappka app and any other app connected to the device first: the device accepts only one connection.
 
 ## Protocol
 
@@ -41,7 +41,7 @@ There is also a standard Battery service (`0x180F`), not used here.
 1. Subscribe to notifications on TX.
 2. Write `20 10 00 D0 07 68 00 03` to RX.
 
-The device then sends a 5-byte ack (`21 00 00 00 00`) followed by the IMU stream. The `01 00` prefix and the `34` byte shown in `triki.md` are not needed (`34` was not tested).
+The device then sends a 5-byte ack (`21 00 00 00 00`) followed by the IMU stream.
 
 ### Stream format
 
@@ -67,10 +67,10 @@ Write `01` (on) or `00` (off) to the LED characteristic with `response=True`. Re
 
 ## Do not
 
-Never write `0x42` to RX. It reboots the device into DFU (firmware update) mode (see `.tmp/zabka-triki-hardware/dfu_trigger.py`).
+Never write `0x42` to RX. It reboots the device into DFU (firmware update) mode.
 
 ## Not verified
 
 - Axis sign conventions of gyro vs. accelerometer (matters for sensor fusion).
-- The `34` init variant from `triki.md`.
+- An alternative init sequence (`01 00`, then the same frame with `34` instead of `68` as the sixth byte). The `68` frame above works on its own; the alternative was not tested.
 - Which button value corresponds to a press was inferred from changes during a run, not from a clean isolated press.
