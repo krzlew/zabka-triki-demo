@@ -4,6 +4,12 @@ Minimal Python client for the Żabka "Triki" BLE device (nRF52810 + LSM6DSL IMU)
 
 Findings below were verified on a real device.
 
+## Disclaimer
+
+This is an unofficial, open-source, AI-assisted experiment: it was written with Claude, an AI coding assistant, to test what the Triki's motion sensor, button and LED can do over Bluetooth. It is not affiliated with, endorsed by, or sponsored by Żabka Polska. "Żabka", "Żappka" and "Triki" are trademarks of their respective owners.
+
+This software is provided strictly for educational purposes and to enable hardware interoperability. It is experimental and comes with no warranty, so use it at your own risk. No proprietary firmware or applications were decompiled or distributed in the creation of this project. The BLE details it uses come from publicly shared community notes and were verified on the author's own device. The code only reads the device's sensor stream and switches its LED; it does not modify, replace or read out the device's firmware.
+
 ## Quick start
 
 ```bash
